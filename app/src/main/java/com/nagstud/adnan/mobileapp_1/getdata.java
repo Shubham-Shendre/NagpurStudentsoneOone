@@ -8,8 +8,13 @@ package com.nagstud.adnan.mobileapp_1;
  * for NagStud LLP Project nagpurstudents
  */
 
+import android.app.Dialog;
+import android.app.ProgressDialog;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -28,16 +33,29 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
 
 
 public class getdata extends AppCompatActivity {
+
+    private ProgressDialog pDialog;
+    public static final int progress_bar_type = 0;
+
+
     String query = "faculties";
+    String Subname = null;
     //the URL having the json data
     private String JSON_URL = "https://www.nagpurstudents.org/api/others/api.php?apicall=" + query;
     //listview object
-    ListView listView, listView2, listView3, listView4;
+    ListView listView, listView2, listView3, listView4 , listView5;
     long selection;
     //the facultylist where we will store all the facultyobjects after parsing json
     List<Faculty> facultyList;
@@ -47,6 +65,8 @@ public class getdata extends AppCompatActivity {
     List<Integer> semList;
 
     List<Years> yearsList;
+
+    List<Qpapers> qpapersList;
 
     String facultysend;
     String branchsend;
@@ -310,8 +330,10 @@ public class getdata extends AppCompatActivity {
                                 public void onItemClick(AdapterView<?> parent, View view,
                                                         int position, long id) {
                                     Years year = yearsList.get(position);
-                                    //System.out.println(year.getCode());
+                                    System.out.println(year.getCode());
+                                    String yearselect = year.getCode();
                                     Toast.makeText(getApplicationContext(), "you clicked = "+year.getCode(), Toast.LENGTH_SHORT).show();
+                                    loadPaperList(year.getCode());
                                 }
                             });
                         } catch (JSONException e) {
@@ -333,4 +355,162 @@ public class getdata extends AppCompatActivity {
         requestQueue.add(stringRequest2);
 
     }
+    private void loadPaperList(String year)
+    {
+        final String JSON_URL4 = "https://www.nagpurstudents.org/api/others/api.php?apicall=" + "papers" + "&&" + "faculty=" + facultysend + "&&" + "branch=" + branchsend + "&&" + "sem=" + semsend + "&&" + "year=" + year;
+
+        System.out.println("under loadPaperlist created url="+JSON_URL4);
+        //getting the progressbar
+        final ProgressBar progressBar = (ProgressBar) findViewById(R.id.progressBar);
+        //  System.out.println(branchList);
+        //making the progressbar visible
+        progressBar.setVisibility(View.VISIBLE);
+        //creating a string request to send request to the url
+        StringRequest stringRequest2 = new StringRequest(Request.Method.GET, JSON_URL4,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        //hiding the progressbar after completion
+                        progressBar.setVisibility(View.INVISIBLE);
+                        try {
+                            //getting the whole json object from the response
+                            JSONObject obj = new JSONObject(response);
+                            //we have the array named branch inside the object
+                            //so here we are getting that json array
+                            JSONArray qpapersArray = obj.getJSONArray("papers");
+                            //now looping through all the elements of the json array
+                            // qpapersList.clear();
+                            for (int i = 0; i < qpapersArray.length(); i++) {
+                                //getting the json object of the particular index inside the array
+                                JSONObject qpapersObject = qpapersArray.getJSONObject(i);
+                                System.out.println("papersobject" + qpapersObject);
+                                //creating a branch object and giving them the values from json object
+                                Qpapers getqpaper = new Qpapers(qpapersObject.getString("link"), qpapersObject.getString("name"));
+                                System.out.println("Qpaper " + getqpaper.getName());
+                                //adding the branch to branchlist
+                                qpapersList.add(getqpaper);
+                                System.out.print("Qpaper list end");
+                            }
+                            System.out.println("ssssssssssssssssss"+qpapersList);
+                            //creating custom adapter object
+                            ListViewAdapterQpapers adapter2 = new ListViewAdapterQpapers(qpapersList, getApplicationContext());
+                            //adding the adapter to listview
+                            System.out.println(adapter2);
+                            listView5.setAdapter(adapter2);
+                            // Capture ListView item click
+//                            listView5.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+//
+//                                @Override
+//                                public void onItemClick(AdapterView<?> parent, View view,
+//                                                        int position, long id) {
+//                                    Subname = null;
+//                                    Qpapers qpaper = qpapersList.get(position);
+//                                    // System.out.println(qpaper.getName());
+//
+//                                    Toast.makeText(getApplicationContext(), "you clicked = "+qpaper.getName(), Toast.LENGTH_SHORT).show();
+//                                    //downloadFile(qpaper.getLink());
+//                                    String url = "https://www.nagpurstudents.org/"+qpaper.getLink();
+//                                   // url = url.replaceAll(" ", "%20");
+//                                   // System.out.println("final url="+url);
+//                                   // Subname = qpaper.getName();
+//                                   // new DownloadFileFromURL().execute(url);
+//                                }
+//                            });
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        //displaying the error in toast if occurrs
+
+                        Toast.makeText(getApplicationContext(), error.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+        //creating a request queue
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+        //adding the string request to request queue
+        requestQueue.add(stringRequest2);
+
+    }
+    @Override
+    protected Dialog onCreateDialog(int id){
+        switch (id){
+            case progress_bar_type:
+                pDialog = new ProgressDialog(this);
+                pDialog.setMessage("Downloading file. Please wait...");
+                pDialog.setIndeterminate(false);
+                pDialog.setMax(100);
+                pDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+                pDialog.setCancelable(true);
+                pDialog.show();
+                return pDialog;
+            default:
+                return null;
+        }
+    }
+    class DownloadFileFromURL extends AsyncTask<String, String, String> {
+
+        @Override
+        protected void onPreExecute(){
+            super.onPreExecute();
+            showDialog(progress_bar_type);
+        }
+
+        @Override
+        protected  String doInBackground(String... f_url){
+            int count;
+            try{
+                URL url = new URL(f_url[0]);
+                System.out.println();
+                URLConnection connection = url.openConnection();
+                connection.connect();
+
+                int lenghtOfFile = connection.getContentLength();
+
+                InputStream input = new BufferedInputStream(url.openStream(), 8192);
+
+                String storageDir = String.valueOf((Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)));
+                //String storageDir = String.valueOf((Environment.getExternalStoragePublicDirectory(Environment.getExternalStorageState(/storage/sdcard1/yourpath))));
+                String fileName = "/"+Subname;
+                File imageFile = new File(storageDir+fileName);
+                OutputStream output = new FileOutputStream(imageFile);
+
+                byte data[] = new byte[1024];
+                long total = 0;
+
+                while((count = input.read(data)) != -1){
+                    total += count;
+
+                    publishProgress(""+(int)((total*100)/lenghtOfFile));
+
+                    output.write(data, 0, count);
+                }
+                output.flush();
+
+                output.close();
+                input.close();
+            }catch (Exception e){
+                Log.e("Error: ", e.getMessage());
+            }
+
+            return null;
+
+        }
+
+        protected void onProgressUpdate(String... progress){
+            pDialog.setProgress(Integer.parseInt(progress[0]));
+        }
+
+        @Override
+        protected void onPostExecute(String file_url){
+            dismissDialog(progress_bar_type);
+
+            //String imagePath = Environment.getExternalStorageDirectory() + "/downloadedfile.jpg";
+            // my_image.setImageDrawable(Drawable.createFromPath(imagePath));
+        }
+    }
+
 }
